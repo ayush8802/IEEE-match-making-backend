@@ -277,7 +277,16 @@ This is an automated alert from the IEEE Matchmaking Platform moderation system.
             port: process.env.SMTP_PORT,
         });
         
-        const info = await transporter.sendMail(mailOptions);
+        // Add timeout wrapper to prevent hanging (15 second timeout)
+        const sendPromise = transporter.sendMail(mailOptions);
+        const timeoutPromise = new Promise((_, reject) => {
+            setTimeout(() => {
+                reject(new Error("Email send timeout after 15 seconds"));
+            }, 15000);
+        });
+        
+        const info = await Promise.race([sendPromise, timeoutPromise]);
+        
         logger.info("✅ Moderation alert email sent successfully", {
             messageId: info.messageId,
             to: moderationEmail,
@@ -295,8 +304,21 @@ This is an automated alert from the IEEE Matchmaking Platform moderation system.
             responseCode: error.responseCode,
             to: moderationEmail,
             from: process.env.SMTP_USER,
+            host: process.env.SMTP_HOST,
+            port: process.env.SMTP_PORT,
             stack: error.stack,
         });
+        
+        // Log helpful troubleshooting info for connection timeouts
+        if (error.code === "ETIMEDOUT" || error.message.includes("timeout")) {
+            logger.error("💡 SMTP Connection Timeout - Possible causes:", {
+                issue: "Railway may be blocking outbound SMTP connections (port 587/465)",
+                suggestion1: "Use Railway's email service or a third-party service like SendGrid, Mailgun, or AWS SES",
+                suggestion2: "Or use Gmail API instead of SMTP",
+                suggestion3: "Check Railway firewall/network settings",
+            });
+        }
+        
         throw error;
     }
 }
