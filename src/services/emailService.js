@@ -46,6 +46,24 @@ if (emailService === "gmail_api") {
 }
 
 /**
+ * Encode email subject line for RFC 2047 (required for non-ASCII characters)
+ * @param {string} subject - Subject line text
+ * @returns {string} - RFC 2047 encoded subject
+ */
+function encodeSubject(subject) {
+    // Check if subject contains non-ASCII characters
+    const hasNonAscii = /[^\x00-\x7F]/.test(subject);
+    
+    if (!hasNonAscii) {
+        return subject; // Return as-is if only ASCII
+    }
+    
+    // Encode using RFC 2047 Base64 format: =?UTF-8?B?base64_text?=
+    const base64Encoded = Buffer.from(subject, 'utf-8').toString('base64');
+    return `=?UTF-8?B?${base64Encoded}?=`;
+}
+
+/**
  * Create email transporter
  * Uses environment variables for SMTP configuration
  */
@@ -296,10 +314,13 @@ This is an automated alert from the IEEE Matchmaking Platform moderation system.
             const fromEmail = process.env.GMAIL_USER_EMAIL || "ieeemetaverse@gmail.com";
             
             // Create email message in RFC 2822 format
+            const subjectText = "🚨 Blocked Message Alert - Community Guidelines Violation";
+            const encodedSubject = encodeSubject(subjectText);
+            
             const message = [
                 `From: IEEE Matchmaking Platform <${fromEmail}>`,
                 `To: ${moderationEmail}`,
-                `Subject: 🚨 Blocked Message Alert - Community Guidelines Violation`,
+                `Subject: ${encodedSubject}`,
                 `MIME-Version: 1.0`,
                 `Content-Type: multipart/alternative; boundary="boundary123"`,
                 ``,
@@ -356,10 +377,11 @@ This is an automated alert from the IEEE Matchmaking Platform moderation system.
                 receiverEmail,
             });
 
+            const subjectText = "🚨 Blocked Message Alert - Community Guidelines Violation";
             const msg = {
                 to: moderationEmail,
                 from: process.env.SENDGRID_FROM_EMAIL || "ieeemetaverse@gmail.com",
-                subject: "🚨 Blocked Message Alert - Community Guidelines Violation",
+                subject: subjectText, // SendGrid handles encoding automatically
                 html: htmlContent,
                 text: textContent,
             };
