@@ -126,7 +126,7 @@ export const setupSocket = (io) => {
                         logger.error("Error fetching user names for moderation alert", err);
                     }
 
-                    // Log moderation decision (without message_id since message wasn't saved)
+                    // Log moderation decision first (without message_id since message wasn't saved)
                     await logModerationDecision({
                         messageId: null,
                         senderId: sender_id,
@@ -141,6 +141,7 @@ export const setupSocket = (io) => {
                             to: process.env.MODERATION_EMAIL || "ieeemetaverse@gmail.com",
                             senderEmail: sender_email,
                             receiverEmail: receiver_email,
+                            messagePreview: content.substring(0, 50),
                         });
                         
                         await sendModerationAlert({
@@ -171,6 +172,7 @@ export const setupSocket = (io) => {
                                 .from("moderation_logs")
                                 .update({ email_sent: true })
                                 .eq("id", recentLog.id);
+                            logger.debug("✅ Updated moderation log with email_sent=true", { logId: recentLog.id });
                         }
                     } catch (emailError) {
                         logger.error("❌ Error sending moderation alert email", {
