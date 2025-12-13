@@ -27,7 +27,7 @@ const ALLOWED_QUESTIONNAIRE_FIELDS = [
     "collaborator_background",
     "data_sharing_constraints",
     "ip_licensing_stance",
-    "claude_recommendation",
+    "Chatgpt_recommendation",
     "lama_recommendation",
     "anthropic_recommendation",
     "mutual_recommendation",

@@ -5,6 +5,8 @@
 
 import express from "express";
 import questionnaireRoutes from "./questionnaire.js";
+import contactRoutes from "./contact.js";
+import conversationRoutes from "./conversations.js";
 
 const router = express.Router();
 
@@ -12,6 +14,8 @@ const router = express.Router();
  * API v1 Routes
  */
 router.use("/questionnaire", questionnaireRoutes);
+router.use("/contact", contactRoutes);
+router.use("/conversations", conversationRoutes);
 
 /**
  * Health check endpoint

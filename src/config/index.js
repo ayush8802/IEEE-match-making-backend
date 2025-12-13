@@ -58,6 +58,23 @@ const config = {
   webhook: {
     url: process.env.WEBHOOK_URL || null,
   },
+
+  // Moderation Configuration
+  moderation: {
+    email: process.env.MODERATION_EMAIL || "ieeemetaverse@gmail.com",
+    enableAI: process.env.ENABLE_AI_MODERATION === "true",
+    openaiApiKey: process.env.OPENAI_API_KEY || null,
+    openaiModel: process.env.OPENAI_MODEL || "gpt-3.5-turbo",
+  },
+
+  // Email/SMTP Configuration
+  email: {
+    smtpHost: process.env.SMTP_HOST || "smtp.gmail.com",
+    smtpPort: parseInt(process.env.SMTP_PORT || "587"),
+    smtpSecure: process.env.SMTP_SECURE === "true",
+    smtpUser: process.env.SMTP_USER || null,
+    smtpPass: process.env.SMTP_PASS || null,
+  },
 };
 
 export default config;

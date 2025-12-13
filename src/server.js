@@ -4,6 +4,8 @@
  */
 
 import express from "express";
+import { createServer } from "http";
+import { Server } from "socket.io";
 import cors from "cors";
 import config from "./config/index.js";
 import logger from "./utils/logger.js";
@@ -12,6 +14,7 @@ import { errorHandler, notFoundHandler } from "./middleware/errorHandler.js";
 
 // Initialize Express app
 const app = express();
+const httpServer = createServer(app);
 
 /**
  * Middleware Configuration
@@ -32,7 +35,7 @@ if (config.server.isDevelopment) {
     app.use((req, res, next) => {
         logger.debug(`${req.method} ${req.path}`, {
             query: req.query,
-            body: Object.keys(req.body).length > 0 ? "present" : "empty",
+            body: req.body && Object.keys(req.body).length > 0 ? "present" : "empty",
         });
         next();
     });
@@ -63,11 +66,27 @@ app.use(notFoundHandler);
 app.use(errorHandler);
 
 /**
+ * Socket.io Setup
+ */
+const io = new Server(httpServer, {
+    cors: {
+        origin: config.cors.origin,
+        credentials: config.cors.credentials,
+        methods: ["GET", "POST"],
+    },
+    transports: ["websocket", "polling"],
+    allowEIO3: true,
+});
+
+import { setupSocket } from "./socket/socketHandler.js";
+setupSocket(io);
+
+/**
  * Server Startup
  */
 const PORT = config.server.port;
 
-const server = app.listen(PORT, () => {
+const server = httpServer.listen(PORT, () => {
     logger.info(`Server started successfully`, {
         port: PORT,
         env: config.server.env,
