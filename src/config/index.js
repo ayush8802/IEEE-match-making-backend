@@ -50,7 +50,11 @@ const config = {
 
   // CORS Configuration
   cors: {
-    origin: process.env.FRONTEND_URL || "http://localhost:3000",
+    // Normalize origin by removing trailing slash
+    origin: (() => {
+      const url = process.env.FRONTEND_URL || "http://localhost:3000";
+      return url.endsWith('/') ? url.slice(0, -1) : url;
+    })(),
     credentials: true,
   },
 

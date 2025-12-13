@@ -21,8 +21,30 @@ const httpServer = createServer(app);
  */
 
 // CORS - Allow requests from frontend
+// Use a function to handle origin matching with/without trailing slash
 app.use(cors({
-    origin: config.cors.origin,
+    origin: (origin, callback) => {
+        // Allow requests with no origin (mobile apps, Postman, etc.)
+        if (!origin) {
+            return callback(null, true);
+        }
+        
+        // Normalize both the configured origin and incoming origin (remove trailing slash)
+        const normalizedConfigOrigin = config.cors.origin.replace(/\/$/, '');
+        const normalizedIncomingOrigin = origin.replace(/\/$/, '');
+        
+        if (normalizedConfigOrigin === normalizedIncomingOrigin) {
+            callback(null, true);
+        } else {
+            logger.warn("CORS blocked request", {
+                incomingOrigin: origin,
+                normalizedIncoming: normalizedIncomingOrigin,
+                configuredOrigin: config.cors.origin,
+                normalizedConfig: normalizedConfigOrigin,
+            });
+            callback(new Error('Not allowed by CORS'));
+        }
+    },
     credentials: config.cors.credentials,
 }));
 
@@ -70,7 +92,19 @@ app.use(errorHandler);
  */
 const io = new Server(httpServer, {
     cors: {
-        origin: config.cors.origin,
+        // Socket.io also needs normalized origin handling
+        origin: (origin, callback) => {
+            if (!origin) {
+                return callback(null, true);
+            }
+            const normalizedConfigOrigin = config.cors.origin.replace(/\/$/, '');
+            const normalizedIncomingOrigin = origin.replace(/\/$/, '');
+            if (normalizedConfigOrigin === normalizedIncomingOrigin) {
+                callback(null, true);
+            } else {
+                callback(new Error('Not allowed by CORS'));
+            }
+        },
         credentials: config.cors.credentials,
         methods: ["GET", "POST"],
     },
