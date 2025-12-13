@@ -135,56 +135,7 @@ export const setupSocket = (io) => {
                         result: moderationResult,
                     });
 
-                    // Send email notification to moderation team
-                    try {
-                        logger.info("📧 Attempting to send moderation alert email", {
-                            to: process.env.MODERATION_EMAIL || "ieeemetaverse@gmail.com",
-                            senderEmail: sender_email,
-                            receiverEmail: receiver_email,
-                            messagePreview: content.substring(0, 50),
-                        });
-                        
-                        await sendModerationAlert({
-                            senderName,
-                            senderEmail: sender_email,
-                            receiverName,
-                            receiverEmail: receiver_email,
-                            messageContent: content,
-                            blockedReason: moderationResult.reason,
-                            timestamp: new Date().toISOString(),
-                        });
-                        
-                        logger.info("✅ Moderation alert email sent successfully");
-
-                        // Update log to mark email as sent
-                        // We'll update the most recent log entry for this message
-                        const { data: recentLog } = await supabaseAdmin
-                            .from("moderation_logs")
-                            .select("id")
-                            .eq("sender_id", sender_id)
-                            .eq("message_content", content)
-                            .order("timestamp", { ascending: false })
-                            .limit(1)
-                            .single();
-
-                        if (recentLog?.id) {
-                            await supabaseAdmin
-                                .from("moderation_logs")
-                                .update({ email_sent: true })
-                                .eq("id", recentLog.id);
-                            logger.debug("✅ Updated moderation log with email_sent=true", { logId: recentLog.id });
-                        }
-                    } catch (emailError) {
-                        logger.error("❌ Error sending moderation alert email", {
-                            error: emailError.message,
-                            code: emailError.code,
-                            response: emailError.response,
-                            stack: emailError.stack,
-                        });
-                        // Don't fail the whole operation if email fails
-                    }
-
-                    // Notify sender that message was blocked
+                    // Notify sender IMMEDIATELY that message was blocked (don't wait for email)
                     logger.info("📢 Emitting message_blocked event to sender", {
                         socketId: socket.id,
                         userId: sender_id,
@@ -196,6 +147,60 @@ export const setupSocket = (io) => {
                     });
 
                     logger.info("✅ message_blocked event emitted to socket", { socketId: socket.id });
+
+                    // Send email notification asynchronously (non-blocking)
+                    // Use setImmediate to send email in background without blocking the response
+                    setImmediate(async () => {
+                        try {
+                            logger.info("📧 Attempting to send moderation alert email", {
+                                to: process.env.MODERATION_EMAIL || "ieeemetaverse@gmail.com",
+                                senderEmail: sender_email,
+                                receiverEmail: receiver_email,
+                                messagePreview: content.substring(0, 50),
+                            });
+                            
+                            await sendModerationAlert({
+                                senderName,
+                                senderEmail: sender_email,
+                                receiverName,
+                                receiverEmail: receiver_email,
+                                messageContent: content,
+                                blockedReason: moderationResult.reason,
+                                timestamp: new Date().toISOString(),
+                            });
+                            
+                            logger.info("✅ Moderation alert email sent successfully");
+
+                            // Update log to mark email as sent
+                            const { data: recentLog } = await supabaseAdmin
+                                .from("moderation_logs")
+                                .select("id")
+                                .eq("sender_id", sender_id)
+                                .eq("message_content", content)
+                                .order("timestamp", { ascending: false })
+                                .limit(1)
+                                .single();
+
+                            if (recentLog?.id) {
+                                await supabaseAdmin
+                                    .from("moderation_logs")
+                                    .update({ email_sent: true })
+                                    .eq("id", recentLog.id);
+                                logger.debug("✅ Updated moderation log with email_sent=true", { logId: recentLog.id });
+                            }
+                        } catch (emailError) {
+                            logger.error("❌ Error sending moderation alert email", {
+                                error: emailError.message,
+                                code: emailError.code,
+                                command: emailError.command,
+                                response: emailError.response,
+                                responseCode: emailError.responseCode,
+                                stack: emailError.stack,
+                            });
+                            // Don't fail the whole operation if email fails
+                        }
+                    });
+
                     return; // Stop here - don't save or deliver message
                 }
 
