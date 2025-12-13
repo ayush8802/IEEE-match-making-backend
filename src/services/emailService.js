@@ -13,21 +13,52 @@ import logger from "../utils/logger.js";
  * Uses environment variables for SMTP configuration
  */
 function createTransporter() {
-    // For production, use SMTP settings from environment
-    // For development, you can use Ethereal Email (test account) or a real SMTP service
-    if (config.server.isDevelopment && !process.env.SMTP_HOST) {
-        // In development without SMTP, log email instead of sending
-        logger.warn("SMTP not configured. Emails will be logged only in development mode.");
-        return null;
+    // Check if SMTP is configured
+    const smtpHost = process.env.SMTP_HOST;
+    const smtpUser = process.env.SMTP_USER;
+    const smtpPass = process.env.SMTP_PASS;
+
+    // For production, require SMTP settings
+    if (config.server.isProduction) {
+        if (!smtpHost || !smtpUser || !smtpPass) {
+            logger.error("❌ SMTP not fully configured in production", {
+                hasHost: !!smtpHost,
+                hasUser: !!smtpUser,
+                hasPass: !!smtpPass,
+                missing: [
+                    !smtpHost && "SMTP_HOST",
+                    !smtpUser && "SMTP_USER",
+                    !smtpPass && "SMTP_PASS",
+                ].filter(Boolean),
+            });
+            return null;
+        }
+    } else {
+        // Development mode: if SMTP not configured, log only
+        if (!smtpHost || !smtpUser || !smtpPass) {
+            logger.warn("📧 SMTP not configured. Emails will be logged only in development mode.", {
+                hasHost: !!smtpHost,
+                hasUser: !!smtpUser,
+                hasPass: !!smtpPass,
+            });
+            return null;
+        }
     }
 
+    logger.debug("📧 Creating SMTP transporter", {
+        host: smtpHost,
+        port: parseInt(process.env.SMTP_PORT || "587"),
+        secure: process.env.SMTP_SECURE === "true",
+        user: smtpUser,
+    });
+
     return nodemailer.createTransport({
-        host: process.env.SMTP_HOST || "smtp.gmail.com",
+        host: smtpHost || "smtp.gmail.com",
         port: parseInt(process.env.SMTP_PORT || "587"),
         secure: process.env.SMTP_SECURE === "true", // true for 465, false for other ports
         auth: {
-            user: process.env.SMTP_USER,
-            pass: process.env.SMTP_PASS,
+            user: smtpUser,
+            pass: smtpPass,
         },
     });
 }
@@ -132,9 +163,9 @@ export async function sendModerationAlert({
     const transporter = createTransporter();
     const moderationEmail = process.env.MODERATION_EMAIL || "ieeemetaverse@gmail.com";
 
-    // If no transporter (dev mode without SMTP), just log
+    // If no transporter (SMTP not configured), log and return
     if (!transporter) {
-        logger.warn("📧 Moderation Alert Email (not sent - dev mode):", {
+        logger.warn("📧 Moderation Alert Email (not sent - SMTP not configured):", {
             to: moderationEmail,
             senderName,
             senderEmail,
@@ -142,6 +173,10 @@ export async function sendModerationAlert({
             receiverEmail,
             blockedReason,
             messagePreview: messageContent.substring(0, 100),
+            isProduction: config.server.isProduction,
+            smtpHost: process.env.SMTP_HOST ? "set" : "missing",
+            smtpUser: process.env.SMTP_USER ? "set" : "missing",
+            smtpPass: process.env.SMTP_PASS ? "set" : "missing",
         });
         return;
     }
@@ -222,19 +257,32 @@ This is an automated alert from the IEEE Matchmaking Platform moderation system.
     };
 
     try {
+        logger.info("📧 Sending moderation alert email...", {
+            to: moderationEmail,
+            from: process.env.SMTP_USER,
+            host: process.env.SMTP_HOST,
+            port: process.env.SMTP_PORT,
+        });
+        
         const info = await transporter.sendMail(mailOptions);
         logger.info("✅ Moderation alert email sent successfully", {
             messageId: info.messageId,
             to: moderationEmail,
             from: process.env.SMTP_USER,
+            accepted: info.accepted,
+            rejected: info.rejected,
         });
         return info;
     } catch (error) {
         logger.error("❌ Error sending moderation alert email", {
             error: error.message,
             code: error.code,
+            command: error.command,
             response: error.response,
+            responseCode: error.responseCode,
             to: moderationEmail,
+            from: process.env.SMTP_USER,
+            stack: error.stack,
         });
         throw error;
     }
