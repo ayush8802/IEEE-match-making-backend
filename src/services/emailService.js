@@ -355,8 +355,6 @@ This is an automated alert from the IEEE Matchmaking Platform moderation system.
                 senderEmail,
                 receiverEmail,
             });
-
-            const htmlContent = `
             <div style="font-family: Arial, sans-serif; max-width: 700px; margin: 0 auto; background: #ffffff;">
                 <div style="background: #dc2626; color: #ffffff; padding: 1.5rem; border-radius: 8px 8px 0 0;">
                     <h2 style="margin: 0; font-size: 1.5rem;">⚠️ Message Blocked - Community Guidelines Violation</h2>
