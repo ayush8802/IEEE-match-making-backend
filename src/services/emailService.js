@@ -60,6 +60,19 @@ function createTransporter() {
             user: smtpUser,
             pass: smtpPass,
         },
+        // Connection timeout settings
+        connectionTimeout: 10000, // 10 seconds
+        greetingTimeout: 5000, // 5 seconds
+        socketTimeout: 10000, // 10 seconds
+        // Retry settings
+        pool: true,
+        maxConnections: 1,
+        maxMessages: 3,
+        // TLS options for better compatibility
+        tls: {
+            rejectUnauthorized: false, // Allow self-signed certificates if needed
+            ciphers: 'SSLv3',
+        },
     });
 }
 
