@@ -126,8 +126,23 @@ export const setupSocket = (io) => {
                         logger.error("Error fetching user names for moderation alert", err);
                     }
 
+                    // Log moderation decision (without message_id since message wasn't saved)
+                    await logModerationDecision({
+                        messageId: null,
+                        senderId: sender_id,
+                        receiverId: finalReceiverId,
+                        messageContent: content,
+                        result: moderationResult,
+                    });
+
                     // Send email notification to moderation team
                     try {
+                        logger.info("📧 Attempting to send moderation alert email", {
+                            to: process.env.MODERATION_EMAIL || "ieeemetaverse@gmail.com",
+                            senderEmail: sender_email,
+                            receiverEmail: receiver_email,
+                        });
+                        
                         await sendModerationAlert({
                             senderName,
                             senderEmail: sender_email,
@@ -137,15 +152,8 @@ export const setupSocket = (io) => {
                             blockedReason: moderationResult.reason,
                             timestamp: new Date().toISOString(),
                         });
-
-                        // Log moderation decision (without message_id since message wasn't saved)
-                        await logModerationDecision({
-                            messageId: null,
-                            senderId: sender_id,
-                            receiverId: finalReceiverId,
-                            messageContent: content,
-                            result: moderationResult,
-                        });
+                        
+                        logger.info("✅ Moderation alert email sent successfully");
 
                         // Update log to mark email as sent
                         // We'll update the most recent log entry for this message
@@ -175,11 +183,17 @@ export const setupSocket = (io) => {
                     }
 
                     // Notify sender that message was blocked
+                    logger.info("📢 Emitting message_blocked event to sender", {
+                        socketId: socket.id,
+                        userId: sender_id,
+                    });
+                    
                     socket.emit("message_blocked", {
                         reason: moderationResult.reason || "Message violates community guidelines",
                         content: content, // Include content so UI can show it in warning
                     });
 
+                    logger.info("✅ message_blocked event emitted to socket", { socketId: socket.id });
                     return; // Stop here - don't save or deliver message
                 }
 
